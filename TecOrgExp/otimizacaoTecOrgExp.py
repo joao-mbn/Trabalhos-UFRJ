@@ -28,17 +28,25 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
     # cálculos ponderais
     # =========================================================================
 
-    mm_ibac = 116.16  # g/mol
-    mm_iboh = 74.122  # g/mol
-    mm_hac = 60.052  # g/mol
-
-    d_hac = 1.05  # g/cm3
-    d_iboh = 0.802  # g/cm3
-
     razao_g_ton = 1e-6
     razao_mol_kmol = 1e-3
     razao_cm3_l = 1e-3
-    # ==========================================================================
+
+    mm_ibac = 116.16  # g/mol
+    mm_iboh = 74.122  # g/mol
+    mm_hac = 60.052  # g/mol
+    mm_mgso4 = 120.366 # g/mol
+    mm_naoh = 39.997 # g/mol
+
+    d_hac = 1.05  # g/cm3
+    d_iboh = 0.802  # g/cm3
+    pureza_iboh = 0.985
+    pureza_hac = 0.99
+    numero_hidratacao_mgso4 = 7
+
+    vida_util_catalisador = 730 # dias de uso (2 anos)
+    vida_util_mgso4 = vida_util_catalisador
+    n_bateladas = 5 # por dia
 
     # Dados das correntes de entrada
     # massa das correntes de entrada, em g
@@ -47,10 +55,20 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
     # volume das correntes de entrada, em L
     vol_hac = m_hac / d_hac * razao_cm3_l
     vol_iboh = m_iboh / d_iboh * razao_cm3_l
-    # dados do catalisador
-    vida_util_catalisador = 730 # dias de uso (2 anos)
-    n_bateladas = 5 # por dia
+
+    """
+    Assumiu-se que 10% do HAc não reagido não foi pego na decantação e não irá para a destilação na 3º coluna, mas será capturado por uma solução de NaOH.
+    Assumiu-se que 10% da água produzida não foi pega na decantação e não irá para a destilação na 3º coluna, mas será capturado por MgSO4 seco.
+    """
+    hac_lavado = 0.1 * f1 * (1- rendimento_reacao) # mols.
+    agua_nao_decantada = 0.1 * f1 * rendimento_reacao # mols.
+
+    # quantidade dos sólidos: MgSO4 e catalisador são recuperados. NaOH é consumido.
+    """espera-se que as espécies sejam recuperadas entre uma batelada e outra,
+    logo elas precisam arcar com o volume diário das correntes"""
     quantidade_catalisador = concentracao_catalisador * (vol_hac + vol_iboh) / n_bateladas # g
+    quantidade_mgso4 = agua_nao_decantada * mm_mgso4 / (numero_hidratacao_mgso4 * n_bateladas) # g
+    quantidade_naoh = hac_lavado * mm_naoh # g
 
     # conversão das quantidades de matéria das correntes de mol p/ g.
     def m_corrente(x, mols_corrente): return (x * mm_ibac + (1 - x) * mm_iboh) * mols_corrente
@@ -58,7 +76,7 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
     m_b1 = m_corrente(xb1, b1())
     m_b2 = m_corrente(xb2, b2())
     m_d2 = m_corrente(xd2, d2())
-    m_b3 = m_hac * (1 - rendimento_reacao)
+    m_b3 = m_hac * (1 - rendimento_reacao) - hac_lavado
 
     # =========================================================================
     # cálculos energéticos
@@ -99,7 +117,7 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
         """T(K), resposta em J/(g K)"""
         return cp(T, c1, c2, c3, c4, c5) * razao_mol_kmol / massa_molar
 
-    def calor(cp, massa, diferenca_temperatura): return cp * massa * diferenca_temperatura
+    def calor(cp, massa, T_inferior, T_superior): return massa * integral(cp, T_inferior, T_superior)
 
     def cp_hac(T): return cp_massico(T, mm_hac, 139640, -320.8, 0.8985, 0, 0) # J/(g K)
     def cp_iboh(T): return cp_massico(T, mm_iboh, 191200, -730.4, 2.2998, 0, 0) # J/(g K). Constantes do 1-Butanol
@@ -109,12 +127,12 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
     # calor consumido na reação, em J
     calor_reacao = entalpia_reacao(T_reacao + 273) * razao_mol_kmol * f1 * rendimento_reacao
     # calor para aquecer às correntes de entrada no reator, de T ambiente para T reação, em J
-    calor_hac = calor(cp_hac(T_reacao + 273), m_hac, T_reacao - T_ambiente)
-    calor_iboh = calor(cp_iboh(T_reacao + 273), m_iboh, T_reacao - T_ambiente)
+    calor_hac = calor(cp_hac, m_hac, T_ambiente + 273, T_reacao + 273)
+    calor_iboh = calor(cp_iboh, m_iboh, T_ambiente + 273, T_reacao +273)
     # calor para aquecer às correntes das destilações, em J
-    calor_hac_rec = calor(cp_hac(T_eb_hac + 273), m_b3, T_eb_hac - T_ambiente)
-    calor_iboh_rec = calor(cp_iboh(T_eb_iboh + 273), m_b2, T_eb_iboh - T_ambiente)
-    calor_ibac = calor(cp_ibac(T_eb_ibac + 273), m_b1, T_eb_ibac - T_ambiente)
+    calor_hac_rec = calor(cp_hac, m_b3, T_ambiente + 273, T_eb_hac + 273)
+    calor_iboh_rec = calor(cp_iboh, m_b2, T_ambiente + 273, T_eb_iboh + 273)
+    calor_ibac = calor(cp_ibac, m_b1, T_ambiente + 273, T_eb_ibac + 273)
 
     calor_correntes = calor_hac + calor_iboh + calor_ibac + calor_hac_rec + calor_iboh_rec # J
     calor_total = calor_reacao + calor_correntes # J
@@ -135,6 +153,8 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
     preco_agua_troca_calor = 7.6e-4 # USD/kg
     preco_amberlite = 5 # USD/g
     preco_dowex = 7.5 # USD/g
+    preco_naoh = 800 # USD/ton
+    preco_mgso4 = 300 # USD/ton
 
     def calcula_custo_catalisador(isDowex):
         """o custo do catalisador é relativo a produção de IbAc"""
@@ -142,22 +162,34 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
         return quantidade_catalisador * preco_catalisador / vida_util_catalisador
 
     vendas = (preco_ibac * m_b1 + preco_blenda * m_d2) * razao_g_ton
-    custo_materias_primas = (preco_hac * m_hac + preco_iboh * m_iboh) * razao_g_ton
-    ganho_materias_primas_recuperadas =  (preco_hac * m_b3 + preco_iboh * m_b2) * razao_g_ton
-    custo_catalisador = calcula_custo_catalisador(isDowex)
+    custo_reagentes = (preco_hac * m_hac / pureza_hac + preco_iboh * m_iboh / pureza_iboh) * razao_g_ton
+    ganho_reagentes_recuperados =  (preco_hac * m_b3 + preco_iboh * m_b2) * razao_g_ton
+    custo_naoh = quantidade_naoh * preco_naoh * razao_g_ton
+    custo_mgso4 = quantidade_mgso4 * preco_mgso4 * razao_g_ton / vida_util_mgso4
+    custo_catalisador = quantidade_catalisador * (preco_dowex if isDowex else preco_amberlite) / vida_util_catalisador
     custo_energia = (calor_total) * preco_energia * razao_joule_kwh
     custo_agua_troca_calor = m_agua_troca_calor * preco_agua_troca_calor
 
     margem_bruta_percentual = 100 * (
             vendas
-            - custo_materias_primas
-            + ganho_materias_primas_recuperadas
+            - custo_reagentes
+            + ganho_reagentes_recuperados
+            - custo_naoh
+            - custo_mgso4
             - custo_catalisador
             - custo_energia
             - custo_agua_troca_calor
         ) / vendas
 
-    return margem_bruta_percentual, vendas, custo_materias_primas, ganho_materias_primas_recuperadas, custo_catalisador, custo_energia, custo_agua_troca_calor
+    return margem_bruta_percentual,\
+        vendas,\
+        custo_reagentes,\
+        ganho_reagentes_recuperados,\
+        custo_naoh,\
+        custo_mgso4,\
+        custo_catalisador,\
+        custo_energia,\
+        custo_agua_troca_calor
 
 # =========================================================================
 
@@ -165,8 +197,10 @@ def acha_otimo(f1, esta_usando_Dowex, faixa_temperatura, faixa_catalisador):
 
     margem_bruta_percentual = 0
     vendas = 0
-    custo_materias_primas = 0
-    ganho_materias_primas_recuperadas = 0
+    custo_reagentes = 0
+    ganho_reagentes_recuperados = 0
+    custo_naoh = 0
+    custo_mgso4 = 0
     custo_catalisador = 0
     custo_energia = 0
     custo_agua_troca_calor = 0
@@ -179,12 +213,15 @@ def acha_otimo(f1, esta_usando_Dowex, faixa_temperatura, faixa_catalisador):
     for _isDowex in esta_usando_Dowex:
         for _temperatura_reacao in faixa_temperatura:
             for _concentracao_catalisador in faixa_catalisador:
+
                 _rendimento_reacao = eficiencia_reacao(_isDowex, _temperatura_reacao, _concentracao_catalisador) / 100
 
                 _margem_bruta_percentual,\
                 _vendas,\
-                _custo_materias_primas,\
-                _ganho_materias_primas_recuperadas,\
+                _custo_reagentes,\
+                _ganho_reagentes_recuperados,\
+                _custo_naoh,\
+                _custo_mgso4,\
                 _custo_catalisador,\
                 _custo_energia,\
                 _custo_agua_troca_calor\
@@ -195,33 +232,54 @@ def acha_otimo(f1, esta_usando_Dowex, faixa_temperatura, faixa_catalisador):
                 if _margem_bruta_percentual > margem_bruta_percentual:
                     margem_bruta_percentual = _margem_bruta_percentual
                     vendas = _vendas
-                    custo_materias_primas = _custo_materias_primas
-                    ganho_materias_primas_recuperadas = _ganho_materias_primas_recuperadas
+                    custo_reagentes = _custo_reagentes
+                    ganho_reagentes_recuperados = _ganho_reagentes_recuperados
                     custo_catalisador = _custo_catalisador
+                    custo_naoh = _custo_naoh
+                    custo_mgso4 = _custo_mgso4
                     custo_energia = _custo_energia
                     custo_agua_troca_calor = _custo_agua_troca_calor
                     isDowex = _isDowex
                     temperatura_reacao = _temperatura_reacao
                     concentracao_catalisador = _concentracao_catalisador
 
-    return pontos_dispersao, {
-        "Catalisador Utilizado": "Dowex 50 - WX2" if isDowex else "Amberlite IR - 122",
-        "Concentração do Catalisador (g/L)": round(concentracao_catalisador),
-        "Temperatura de Reação (ºC)": round(temperatura_reacao),
-        "Margem Bruta (%)": round(margem_bruta_percentual, 2),
-        "Vendas (USD)": round(vendas),
-        "Custo de Matérias-Primas (USD)": round(custo_materias_primas),
-        "Economia com Matérias-Primas Recuperadas (USD)": round(ganho_materias_primas_recuperadas),
-        "Amortização do Catalisador (USD)": round(custo_catalisador),
-        "Custo de Energia (USD)": round(custo_energia),
-        "Custo de Água para Troca de Calor (USD)": round(custo_agua_troca_calor),
-    }
+    return pontos_dispersao,\
+        {
+            "Catalisador Utilizado": "Dowex 50 - WX2" if isDowex else "Amberlite IR - 122",
+            "Concentração do Catalisador (g/L)": round(concentracao_catalisador),
+            "Temperatura de Reação (ºC)": round(temperatura_reacao),
+            "Margem Bruta (%)": round(margem_bruta_percentual, 2),
+            "Vendas (USD)": round(vendas),
+            "Custo de Reagentes (USD)": round(custo_reagentes),
+            "Economia com Reagentes Recuperados (USD)": round(ganho_reagentes_recuperados),
+            "Custo do NaOH (USD)": round(custo_naoh),
+            "Custo do MgSO4 (USD)": round(custo_mgso4),
+            "Amortização do Catalisador (USD)": round(custo_catalisador),
+            "Custo de Energia (USD)": round(custo_energia),
+            "Custo de Água para Troca de Calor (USD)": round(custo_agua_troca_calor)
+        }
 
 def eficiencia_reacao(isDowex, temperatura, concentracao_catalisador):
     if isDowex:
         return 59.18977 + 0.14273 * temperatura + 0.013917 * concentracao_catalisador + 1.7e-3 * temperatura * concentracao_catalisador
     else:
         return 40.34083 + 0.19633 * temperatura + 0.80342 * concentracao_catalisador + 1.7e-3 * temperatura * concentracao_catalisador
+
+def integral(f, a, b, h = 1e-3):
+    """Calcula a integral numérica de uma função f no intervalo a, b.
+    Args:
+        f (function(arg: float)): função à ser integrada
+        a (float): [limite inferior de integração]
+        b (float): [limite superior de integração]
+        h (float): [valor considerado infinitesimal]
+    Returns:
+        (float): [integral da função f no intervalo a, b]
+    """
+    n = int((b - a) / h)
+    integral = 0
+    for i in range(1, n + 1):
+        integral += f(a + i * h) * h
+    return integral
 
 def gera_superficie_resposta(pontos):
 
@@ -271,8 +329,3 @@ melhor_condicao = main()
 # ========================================================================================================
 # ========================================================================================================
 # ========================================================================================================
-
-# TODO: calcular o calor como integral de W cpdT, já que cp não é constante.
-# TODO: adicionar os custos do sulfato de magnésio e NaOH. Descontar o HAc que entra na destilação com base no que o NaOH captura.
-# TODO: atualizar nº dos equipamentos de destilação no diagrama
-# TODO: adicionar considerações de impureza dos reagentes
