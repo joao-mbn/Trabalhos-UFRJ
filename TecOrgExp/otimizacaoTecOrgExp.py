@@ -246,17 +246,17 @@ def acha_otimo(f1, esta_usando_Dowex, faixa_temperatura, faixa_catalisador):
     return pontos_dispersao,\
         {
             "Catalisador Utilizado": "Dowex 50 - WX2" if isDowex else "Amberlite IR - 122",
-            "Concentração do Catalisador (g/L)": round(concentracao_catalisador),
-            "Temperatura de Reação (ºC)": round(temperatura_reacao),
+            "Concentração do Catalisador (g/L)": round(concentracao_catalisador, 2),
+            "Temperatura de Reação (ºC)": round(temperatura_reacao, 2),
             "Margem Bruta (%)": round(margem_bruta_percentual, 2),
-            "Vendas (USD)": round(vendas),
-            "Custo de Reagentes (USD)": round(custo_reagentes),
-            "Economia com Reagentes Recuperados (USD)": round(ganho_reagentes_recuperados),
-            "Custo do NaOH (USD)": round(custo_naoh),
-            "Custo do MgSO4 (USD)": round(custo_mgso4),
-            "Amortização do Catalisador (USD)": round(custo_catalisador),
-            "Custo de Energia (USD)": round(custo_energia),
-            "Custo de Água para Troca de Calor (USD)": round(custo_agua_troca_calor)
+            "Vendas (USD)": round(vendas, 2),
+            "Custo de Reagentes (USD)": round(custo_reagentes, 2),
+            "Economia com Reagentes Recuperados (USD)": round(ganho_reagentes_recuperados, 2),
+            "Custo do NaOH (USD)": round(custo_naoh, 2),
+            "Custo do MgSO4 (USD)": round(custo_mgso4, 2),
+            "Amortização do Catalisador (USD)": round(custo_catalisador, 2),
+            "Custo de Energia (USD)": round(custo_energia, 2),
+            "Custo de Água para Troca de Calor (USD)": round(custo_agua_troca_calor, 2)
         }
 
 def eficiencia_reacao(isDowex, temperatura, concentracao_catalisador):
@@ -265,7 +265,7 @@ def eficiencia_reacao(isDowex, temperatura, concentracao_catalisador):
     else:
         return 40.34083 + 0.19633 * temperatura + 0.80342 * concentracao_catalisador + 1.7e-3 * temperatura * concentracao_catalisador
 
-def integral(f, a, b, h = 1e-3):
+def integral(f, a, b, h = 1e-1):
     """Calcula a integral numérica de uma função f no intervalo a, b.
     Args:
         f (function(arg: float)): função à ser integrada
@@ -301,7 +301,7 @@ def main():
     f1 é base de cálculo em mols/dia --> corrente de entrada de um reagente no reator e a corrente total na 1º coluna de destilação
     ela é o número arredondado para uma estimativa de produção do acetado de isobutila:
 
-    50.000 Ton/Ano ~ 136 Ton/dia = 136e6 g/dia ~ 1.2e6 mols/dia
+    35000 Ton/Ano de output --> 134 Ton/dia = 134e6 g/dia ~ 1.2e6 mols/dia
     """
 
     f1 = 1.2e6 # mols/dia
@@ -314,7 +314,7 @@ def main():
 
     esta_usando_Dowex = [True, False]
     faixa_temperatura = np.linspace(limite_inferior_temperatura, limite_superior_temperatura, limite_superior_temperatura - limite_inferior_temperatura + 1)
-    faixa_catalisador = np.linspace(limite_inferior_catalisador, limite_superior_catalisador, limite_superior_catalisador - limite_inferior_catalisador + 1)
+    faixa_catalisador = np.linspace(limite_inferior_catalisador, limite_superior_catalisador, (limite_superior_catalisador - limite_inferior_catalisador) * 10 + 1)
 
     pontos_dispersao, condicao_otima = acha_otimo(f1, esta_usando_Dowex, faixa_temperatura, faixa_catalisador)
     pontos_dispersao_dowex = list(filter(lambda ponto: ponto[0] == True, pontos_dispersao))
