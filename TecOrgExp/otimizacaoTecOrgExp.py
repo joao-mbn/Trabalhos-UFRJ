@@ -1,5 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
+import helpers
 
 def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendimento_reacao):
 
@@ -117,7 +117,7 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
         """T(K), resposta em J/(g K)"""
         return cp(T, c1, c2, c3, c4, c5) * razao_mol_kmol / massa_molar
 
-    def calor(cp, massa, T_inferior, T_superior): return massa * integral(cp, T_inferior, T_superior)
+    def calor(cp, massa, T_inferior, T_superior): return massa * helpers.integral(cp, T_inferior, T_superior)
 
     def cp_hac(T): return cp_massico(T, mm_hac, 139640, -320.8, 0.8985, 0, 0) # J/(g K)
     def cp_iboh(T): return cp_massico(T, mm_iboh, 191200, -730.4, 2.2998, 0, 0) # J/(g K). Constantes do 1-Butanol
@@ -265,37 +265,16 @@ def eficiencia_reacao(isDowex, temperatura, concentracao_catalisador):
     else:
         return 40.34083 + 0.19633 * temperatura + 0.80342 * concentracao_catalisador + 1.7e-3 * temperatura * concentracao_catalisador
 
-def integral(f, a, b, h = 1e-1):
-    """Calcula a integral numérica de uma função f no intervalo a, b.
-    Args:
-        f (function(arg: float)): função à ser integrada
-        a (float): [limite inferior de integração]
-        b (float): [limite superior de integração]
-        h (float): [valor considerado infinitesimal]
-    Returns:
-        (float): [integral da função f no intervalo a, b]
-    """
-    n = int((b - a) / h)
-    integral = 0
-    for i in range(1, n + 1):
-        integral += f(a + i * h) * h
-    return integral
+def gera_pontos_dispersao_conversao(temperaturas, faixa_catalisador):
+    eficiencia_reacao_dowex = []
+    eficiencia_reacao_amberlite = []
 
-def gera_superficie_resposta(pontos):
+    for temperatura in temperaturas:
+        for concentracao_catalisador in faixa_catalisador:
+            eficiencia_reacao_dowex.append([True, temperatura, concentracao_catalisador, eficiencia_reacao(True, temperatura, concentracao_catalisador)])
+            eficiencia_reacao_amberlite.append([False, temperatura, concentracao_catalisador, eficiencia_reacao(False, temperatura, concentracao_catalisador)])
 
-    temperaturas = [ponto[1] for ponto in pontos]
-    carga = [ponto[2] for ponto in pontos]
-    margem_bruta = [ponto[3] for ponto in pontos]
-
-    fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(projection='3d')
-    scatter = ax.scatter(temperaturas, carga, margem_bruta, c=margem_bruta, cmap='inferno_r')
-    ax.set_xlabel('Tempertura (ºC)')
-    ax.set_ylabel('Carga (g/L)')
-    ax.set_zlabel('Margem Bruta (%)')
-    plt.title("{catalisador}".format(catalisador = 'Dowex 50 - WX2' if pontos[0][0] else 'Amberlite IR - 122'))
-    plt.colorbar(scatter)
-    plt.show()
+    return eficiencia_reacao_dowex, eficiencia_reacao_amberlite
 
 def main():
     """
@@ -316,13 +295,17 @@ def main():
     esta_usando_Dowex = [True, False]
     faixa_temperatura = np.linspace(limite_inferior_temperatura, limite_superior_temperatura, limite_superior_temperatura - limite_inferior_temperatura + 1)
     faixa_catalisador = np.linspace(limite_inferior_catalisador, limite_superior_catalisador, (limite_superior_catalisador - limite_inferior_catalisador) * 10 + 1)
+    eficiencia_reacao_dowex, eficiencia_reacao_amberlite = gera_pontos_dispersao_conversao(faixa_temperatura, faixa_catalisador)
+
+    helpers.gera_superficie_resposta(eficiencia_reacao_dowex, 'conversao')
+    helpers.gera_superficie_resposta(eficiencia_reacao_amberlite, 'conversao')
 
     pontos_dispersao, condicao_otima = acha_otimo(f1, esta_usando_Dowex, faixa_temperatura, faixa_catalisador)
     pontos_dispersao_dowex = list(filter(lambda ponto: ponto[0] == True, pontos_dispersao))
     pontos_dispersao_amberlite = list(filter(lambda ponto: ponto[0] == False, pontos_dispersao))
 
-    gera_superficie_resposta(pontos_dispersao_dowex)
-    gera_superficie_resposta(pontos_dispersao_amberlite)
+    helpers.gera_superficie_resposta(pontos_dispersao_dowex)
+    helpers.gera_superficie_resposta(pontos_dispersao_amberlite)
 
     return condicao_otima
 
