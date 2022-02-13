@@ -289,11 +289,12 @@ def gera_superficie_resposta(pontos):
 
     fig = plt.figure(figsize=(12, 12))
     ax = fig.add_subplot(projection='3d')
-    ax.scatter(temperaturas, carga, margem_bruta)
+    scatter = ax.scatter(temperaturas, carga, margem_bruta, c=margem_bruta, cmap='inferno_r')
     ax.set_xlabel('Tempertura (ºC)')
     ax.set_ylabel('Carga (g/L)')
     ax.set_zlabel('Margem Bruta (%)')
     plt.title("{catalisador}".format(catalisador = 'Dowex 50 - WX2' if pontos[0][0] else 'Amberlite IR - 122'))
+    plt.colorbar(scatter)
     plt.show()
 
 def main():
