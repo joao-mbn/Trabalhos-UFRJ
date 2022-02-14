@@ -156,11 +156,6 @@ def calcula_custos_ganhos(f1, T_reacao, concentracao_catalisador, isDowex, rendi
     preco_naoh = 800 # USD/ton
     preco_mgso4 = 300 # USD/ton
 
-    def calcula_custo_catalisador(isDowex):
-        """o custo do catalisador é relativo a produção de IbAc"""
-        preco_catalisador = preco_dowex if isDowex else preco_amberlite
-        return quantidade_catalisador * preco_catalisador / vida_util_catalisador
-
     vendas = (preco_ibac * m_b1 + preco_blenda * m_d2) * razao_g_ton
     custo_reagentes = (preco_hac * m_hac / pureza_hac + preco_iboh * m_iboh / pureza_iboh) * razao_g_ton
     ganho_reagentes_recuperados =  (preco_hac * m_b3 + preco_iboh * m_b2) * razao_g_ton
