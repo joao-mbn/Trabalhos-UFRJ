@@ -101,4 +101,3 @@ beta = [1.35,2.36,1.23,0.97,1.25,1.18,0.96,1.34,1.5]
 ph = [1, 2, 3]
 ext = [17, 26, 35]
 main('Cyanex 272-HNO3', 'viridis_r', [(e, '% Dy Extraído'), (beta, 'Beta Dy/Tb')], ph, ext)
-
